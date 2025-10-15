@@ -4,7 +4,6 @@ from skimage import io
 import matplotlib.pyplot as plt
 
 
-
 my_image = io.imread("/Users/zephyrburka/Downloads/red-cube-icon-isometric-red-cube-vector-icon-web-design-isolated-white-background_96318-42681.jpg")
 my_image = cv2.resize(my_image, (256, 256))
 plt.imshow(my_image)
@@ -22,6 +21,7 @@ print(mse_fast(my_image, canvas))
 true_mse = mse_fast(my_image, canvas)
 fake_mse = true_mse
 h, w, c = my_image.shape
+
 def random_triangle(height, width):
     pts = np.array([
         [np.random.randint(0, width), np.random.randint(0, height)],
@@ -61,67 +61,40 @@ def mutate_color(triangle):
 
 
 num = 1
-true_mse = mse_fast(my_image, canvas)  # Initialize
-
-for i in range(20):  # Add 20 shapes
-    best_triangle = None
-    best_triangle_mse = true_mse
+for i in range(20):
     
-    # Try 10 random candidate shapes
     for shapes in range(10):
-        # Random starting triangle
+
         triangle = {
-            "pts": random_triangle(h, w),
-            "color": random_color()
+        "pts": random_triangle(h, w),
+        "color": random_color()
         }
-        
-        candidate_mse = true_mse  # ← KEY: Start from current baseline
-        best_shape = triangle
-        
-        # === PHASE 1: Optimize SHAPE (keep color fixed) ===
-        for mutations in range(1500):
-            test_triangle = best_shape.copy()
-            test_triangle["pts"] = best_shape["pts"].copy()
-            
-            # Only mutate shape
-            test_triangle = mutate_triangle(test_triangle, w, h)
+        test_triangle = triangle.copy()
+        test_triangle["pts"] = triangle["pts"].copy()
+        best_mutation = test_triangle
+        for mutations in range(3000):
+
+            if np.random.rand() <= 0.7:
+                for j in range(100):
+                    test_triangle = mutate_triangle(test_triangle, w, h)
+            else:
+                for j in range(50):
+                    test_triangle = mutate_color(test_triangle)
 
             test_canvas = canvas.copy()
             cv2.fillPoly(test_canvas, [test_triangle["pts"]], test_triangle["color"])
+
             test_mse = mse_fast(my_image, test_canvas)
 
-            if test_mse < candidate_mse:
-                best_shape = test_triangle
-                candidate_mse = test_mse
-        
-        # === PHASE 2: Optimize COLOR (keep shape fixed) ===
-        for mutations in range(1500):
-            test_triangle = best_shape.copy()
-            
-            # Only mutate color
-            test_triangle = mutate_color(test_triangle)
-
-            test_canvas = canvas.copy()
-            cv2.fillPoly(test_canvas, [test_triangle["pts"]], test_triangle["color"])
-            test_mse = mse_fast(my_image, test_canvas)
-
-            if test_mse < candidate_mse:
-                best_shape = test_triangle
-                candidate_mse = test_mse
-        
-        # Is this the best candidate so far?
-        if candidate_mse < best_triangle_mse:
-            best_triangle = best_shape
-            best_triangle_mse = candidate_mse
-    
-    # Add best triangle to canvas (safety check)
-    if best_triangle is not None:
-        cv2.fillPoly(canvas, [best_triangle["pts"]], best_triangle["color"])
-        true_mse = best_triangle_mse
-        print(f"Shape {num}/20, MSE: {true_mse:.2f}")
-    else:
-        print(f"Shape {num}/20: No improvement found, skipping")
-    num += 1
+            if test_mse < fake_mse:
+                best_mutation = test_triangle
+                fake_mse = test_mse
+                triangle = test_triangle
+            else:
+                test_triangle = best_mutation
+        if fake_mse < true_mse:
+            best_triangle = best_mutation
+            true_mse = fake_mse
         
     cv2.fillPoly(canvas, [best_triangle["pts"]], best_triangle["color"])
     true_mse = mse_fast(my_image, canvas)
@@ -134,4 +107,5 @@ for i in range(20):  # Add 20 shapes
 plt.imshow(canvas)
 plt.axis("off")
 plt.show()
+
 
